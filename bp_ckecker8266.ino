@@ -214,6 +214,9 @@ void connectToWiFi() {
     server.on("/bp_model", HTTP_GET, handleBpModelPage);
     server.on("/set_bp_model", HTTP_POST, handleSetBpModel);
     
+    // 添加這一行，修復原始數據查看問題
+    server.on("/raw_data", HTTP_GET, handleRawData);
+    
     // 添加重置路由
     server.on("/reset", HTTP_GET, []() {
       EEPROM.begin(EEPROM_SIZE);
@@ -1079,6 +1082,7 @@ void handleRawData() {
     html += "<style>body{font-family:Arial;margin:20px;} ";
     html += "pre{background:#f5f5f5;padding:10px;border-radius:5px;overflow-x:auto;}";
     html += ".back-btn{display:inline-block;margin:20px 0;padding:8px 15px;background:#007bff;color:white;text-decoration:none;border-radius:4px;}";
+    html += ".data-box{background:#e8f4f8;padding:10px;border-radius:5px;margin:10px 0;font-family:monospace;}";
     html += "</style></head><body>";
     
     html += "<h1>測量時間: " + record.timestamp + "</h1>";
@@ -1091,7 +1095,14 @@ void handleRawData() {
       html += "<p>數據無法解析為有效血壓值</p>";
     }
     
-    html += "<div>" + record.rawData + "</div>";
+    // 顯示原始ASCII數據
+    html += "<h2>原始數據 (ASCII):</h2>";
+    html += "<div class='data-box'>" + record.allFields + "</div>";
+    
+    // 顯示格式化的數據
+    html += "<h2>格式化數據:</h2>";
+    html += record.rawData;
+    
     html += "<a href='/history' class='back-btn'>返回歷史記錄</a>";
     html += "</body></html>";
     
