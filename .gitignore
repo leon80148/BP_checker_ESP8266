@@ -1,0 +1,13 @@
+# Build
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Arduino IDE
+*.elf
+*.hex
