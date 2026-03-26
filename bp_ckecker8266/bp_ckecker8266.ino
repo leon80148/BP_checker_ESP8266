@@ -16,7 +16,8 @@
 
 // AP模式設定
 const char* ap_ssid = "ESP8266_BP_checker";
-const char* ap_password = "12345678";
+const char* default_ap_password = "12345678"; // 預設密碼（首次使用）
+String ap_password_str = "12345678"; // 可從 EEPROM 載入的 AP 密碼
 const char* hostname = "bp_checker"; // mDNS主機名
 
 // WiFi設定
@@ -46,6 +47,7 @@ bool apMode = false;
 #define SSID_ADDR 0
 #define PWD_ADDR 64
 #define BP_MODEL_ADDR 128
+#define AP_PWD_ADDR 192   // AP密碼在EEPROM中的位置
 #define EEPROM_SIZE 4096  // 增加EEPROM大小以容納更多記錄
 
 // 從EEPROM讀取字串
@@ -98,7 +100,7 @@ void startAPMode() {
   
   // 設置AP模式
   WiFi.mode(WIFI_AP);
-  bool result = WiFi.softAP(ap_ssid, ap_password);
+  bool result = WiFi.softAP(ap_ssid, ap_password_str.c_str());
   
   if (result) {
     Serial.println("AP模式啟動成功");
@@ -142,6 +144,10 @@ void startAPMode() {
   server.on("/bp_model", HTTP_GET, handleBpModelPage);
   server.on("/set_bp_model", HTTP_POST, handleSetBpModel);
   
+  // 添加 AP 密碼設定路由
+  server.on("/ap_password", HTTP_GET, handleApPasswordPage);
+  server.on("/set_ap_password", HTTP_POST, handleSetApPassword);
+  
   // 添加歷史記錄相關API
   server.on("/history", HTTP_GET, handleHistory);
   server.on("/api/history", HTTP_GET, handleHistoryAPI);
@@ -151,7 +157,7 @@ void startAPMode() {
   
   server.begin();
   Serial.println("HTTP伺服器已啟動");
-  Serial.println("請連接到WiFi: " + String(ap_ssid) + "，密碼: " + String(ap_password));
+  Serial.println("請連接到WiFi: " + String(ap_ssid) + "，密碼: " + ap_password_str);
   Serial.println("然後開啟瀏覽器訪問: " + myIP.toString());
 }
 
@@ -162,7 +168,7 @@ void connectToWiFi() {
   WiFi.mode(WIFI_AP_STA);
   
   // 維持AP熱點開啟
-  bool apResult = WiFi.softAP(ap_ssid, ap_password);
+  bool apResult = WiFi.softAP(ap_ssid, ap_password_str.c_str());
   if (apResult) {
     Serial.println("AP模式啟動成功");
   } else {
@@ -213,6 +219,10 @@ void connectToWiFi() {
     // 添加血壓機型號設定路由
     server.on("/bp_model", HTTP_GET, handleBpModelPage);
     server.on("/set_bp_model", HTTP_POST, handleSetBpModel);
+    
+    // 添加 AP 密碼設定路由
+    server.on("/ap_password", HTTP_GET, handleApPasswordPage);
+    server.on("/set_ap_password", HTTP_POST, handleSetApPassword);
     
     // 添加這一行，修復原始數據查看問題
     server.on("/raw_data", HTTP_GET, handleRawData);
@@ -270,6 +280,13 @@ void setup() {
   if (bp_model.length() == 0) {
     bp_model = "OMRON-HBP9030";
   }
+  
+  // 讀取 AP 密碼設定
+  String saved_ap_pwd = readStringFromEEPROM(AP_PWD_ADDR);
+  if (saved_ap_pwd.length() >= 8) {  // WiFi 密碼最少 8 碼
+    ap_password_str = saved_ap_pwd;
+  }
+  Serial.println("AP密碼: " + ap_password_str);
   
   Serial.println("讀取到的WiFi設定: SSID=" + sta_ssid + ", PWD長度=" + String(sta_password.length()));
   Serial.println("血壓機型號: " + bp_model);
@@ -753,6 +770,7 @@ void handleRoot() {
   
   html += "<div class='nav'>";
   html += "<a href='/bp_model'>血壓機型號設定</a>";
+  html += "<a href='/ap_password'>AP密碼設定</a>";
   html += "<a href='/'>返回監控</a>";
   html += "</div>";
   
@@ -893,7 +911,7 @@ void handleMonitor() {
   html += "<li>血壓機型號: " + bp_model + "</li>";
   html += "<li>IP地址: " + WiFi.localIP().toString() + "</li>";
   html += "<li>可通過 <strong>http://" + String(hostname) + ".local</strong> 訪問</li>";
-  html += "<li>AP熱點: " + String(ap_ssid) + " (密碼: " + String(ap_password) + ")</li>";
+  html += "<li>AP熱點: " + String(ap_ssid) + " (密碼: " + ap_password_str + ")</li>";
   html += "</ul></div>";
   
   html += "<p><a href='/reset' style='color:red;'>重置WiFi設定</a></p>";
@@ -1110,4 +1128,73 @@ void handleRawData() {
   } else {
     server.send(400, "text/plain", "缺少記錄ID");
   }
+}
+
+void handleApPasswordPage() {
+  String html = "<html><head><meta charset='UTF-8'><title>AP密碼設定</title>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<style>body{font-family:Arial;margin:20px;} ";
+  html += ".form-box{background:#f0f0f0;border:1px solid #ddd;padding:20px;border-radius:5px;max-width:400px;margin:0 auto;}";
+  html += "input{width:100%;padding:8px;margin:8px 0;box-sizing:border-box;}";
+  html += "button{background:#4CAF50;color:white;padding:10px;border:none;cursor:pointer;width:100%;}";
+  html += ".info{background:#fff3cd;padding:10px;border-radius:5px;margin-top:15px;font-size:14px;}";
+  html += ".nav{margin-top:20px;text-align:center;}";
+  html += ".nav a{margin:0 10px;color:#007bff;text-decoration:none;}";
+  html += "</style></head><body>";
+  html += "<div class='form-box'>";
+  html += "<h2>AP 熱點密碼設定</h2>";
+  html += "<form method='post' action='/set_ap_password'>";
+  html += "新密碼（至少 8 碼）:<br>";
+  html += "<input type='password' name='new_ap_pwd' minlength='8' maxlength='63' required placeholder='輸入新的AP密碼'><br>";
+  html += "確認密碼:<br>";
+  html += "<input type='password' name='confirm_ap_pwd' minlength='8' maxlength='63' required placeholder='再次輸入新密碼'><br><br>";
+  html += "<button type='submit'>儲存密碼</button>";
+  html += "</form>";
+  html += "<div class='info'>";
+  html += "<p>⚠️ 修改後裝置將重新啟動，請使用新密碼連接 AP 熱點</p>";
+  html += "<p>目前 AP 名稱: <strong>" + String(ap_ssid) + "</strong></p>";
+  html += "</div>";
+  html += "<div class='nav'>";
+  html += "<a href='/'>返回主頁</a>";
+  html += "<a href='/config'>WiFi設定</a>";
+  html += "</div>";
+  html += "</div></body></html>";
+  server.send(200, "text/html", html);
+}
+
+void handleSetApPassword() {
+  String new_pwd = server.arg("new_ap_pwd");
+  String confirm_pwd = server.arg("confirm_ap_pwd");
+  
+  if (new_pwd.length() < 8) {
+    server.send(400, "text/html", "<html><head><meta charset='UTF-8'></head><body><h2>密碼至少需要 8 個字元</h2><a href='/ap_password'>返回</a></body></html>");
+    return;
+  }
+  
+  if (new_pwd != confirm_pwd) {
+    server.send(400, "text/html", "<html><head><meta charset='UTF-8'></head><body><h2>兩次輸入的密碼不一致</h2><a href='/ap_password'>返回</a></body></html>");
+    return;
+  }
+  
+  // 儲存到 EEPROM
+  EEPROM.begin(EEPROM_SIZE);
+  Serial.println("儲存新 AP 密碼，長度: " + String(new_pwd.length()));
+  writeStringToEEPROM(AP_PWD_ADDR, new_pwd);
+  ap_password_str = new_pwd;
+  
+  String html = "<html><head><meta charset='UTF-8'><title>密碼已更新</title>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<style>body{font-family:Arial;margin:20px;text-align:center;} ";
+  html += ".success-box{background:#dff0d8;border:1px solid #d6e9c6;padding:20px;border-radius:5px;max-width:400px;margin:20px auto;}";
+  html += "</style></head><body>";
+  html += "<div class='success-box'>";
+  html += "<h2>AP 密碼已更新</h2>";
+  html += "<p>裝置將重新啟動，請使用新密碼連接 AP 熱點</p>";
+  html += "<p>AP 名稱: <strong>" + String(ap_ssid) + "</strong></p>";
+  html += "</div></body></html>";
+  
+  server.send(200, "text/html", html);
+  
+  delay(3000);
+  ESP.restart();
 }
