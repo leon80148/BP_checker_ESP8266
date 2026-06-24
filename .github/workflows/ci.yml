@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compile-sketch:
+    name: Compile ESP8266 sketch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile sketch
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: esp8266:esp8266:nodemcuv2
+          platforms: |
+            - name: esp8266:esp8266
+              source-url: https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          libraries: |
+            - source-path: ./lib
+              destination-name: BPCheckerESP8266
+            - name: ArduinoJson
+          sketch-paths: |
+            - bp_ckecker8266

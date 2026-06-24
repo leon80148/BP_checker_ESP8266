@@ -7,8 +7,8 @@
 #include <TZ.h>
 #include <coredecls.h>
 #include <PolledTimeout.h>
-#include "lib/BP_Parser.h"        // 引入血壓機解析器庫
-#include "lib/BPRecordManager.h"  // 引入血壓記錄管理器庫
+#include "BP_Parser.h"        // 引入血壓機解析器庫
+#include "BPRecordManager.h"  // 引入血壓記錄管理器庫
 
 // USB接口的引腳定義
 #define USB_DP_PIN 1  // USB D+ 引腳 Tx
