@@ -16,8 +16,7 @@
 
 // AP模式設定
 const char* ap_ssid = "ESP8266_BP_checker";
-const char* default_ap_password = "12345678"; // 預設密碼（首次使用）
-String ap_password_str = "12345678"; // 可從 EEPROM 載入的 AP 密碼
+String ap_password_str = ""; // 啟動時產生或從 EEPROM 載入的 AP 密碼
 const char* hostname = "bp_checker"; // mDNS主機名
 
 // WiFi設定
@@ -49,6 +48,15 @@ bool apMode = false;
 #define BP_MODEL_ADDR 128
 #define AP_PWD_ADDR 192   // AP密碼在EEPROM中的位置
 #define EEPROM_SIZE 4096  // 增加EEPROM大小以容納更多記錄
+
+String generateDefaultApPassword() {
+  const char alphabet[] = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  String password = "bp";
+  for (int i = 0; i < 10; i++) {
+    password += alphabet[ESP.random() % (sizeof(alphabet) - 1)];
+  }
+  return password;
+}
 
 // 從EEPROM讀取字串
 String readStringFromEEPROM(int startAddr) {
@@ -285,6 +293,10 @@ void setup() {
   String saved_ap_pwd = readStringFromEEPROM(AP_PWD_ADDR);
   if (saved_ap_pwd.length() >= 8) {  // WiFi 密碼最少 8 碼
     ap_password_str = saved_ap_pwd;
+  } else {
+    ap_password_str = generateDefaultApPassword();
+    writeStringToEEPROM(AP_PWD_ADDR, ap_password_str);
+    Serial.println("已產生新的 AP 密碼並儲存至 EEPROM");
   }
   Serial.println("AP密碼: " + ap_password_str);
   

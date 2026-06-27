@@ -18,7 +18,9 @@ ESP8266-based WiFi blood pressure monitor bridge. Reads data from OMRON blood pr
 
 1. Flash firmware via Arduino IDE or PlatformIO
 2. Connect to `ESP8266_BP_checker` AP
-3. Configure WiFi via web interface
+3. Use the generated AP password printed in the serial monitor on first boot. The firmware saves it to EEPROM for later boots.
+4. Configure WiFi via web interface
+5. Change the AP password from the web interface after initial setup
 
 ## License
 
